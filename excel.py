@@ -59,7 +59,9 @@ section[data-testid="stSidebar"] { display:none !important; }
     border-radius:0 0 28px 28px;
     padding:20px 28px 16px;
     margin-bottom:24px;
-    position:relative;
+    position:sticky;
+    top:0;
+    z-index:998;
     overflow:hidden;
     box-shadow:0 8px 32px rgba(10,15,44,0.25);
 }
@@ -431,30 +433,44 @@ hr { border-color:var(--border) !important;margin:16px 0 !important; }
 ::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
 ::-webkit-scrollbar-thumb:hover { background:var(--blue); }
 
-/* ═══ BACK BUTTON FLOATING ═══ */
-.back-fab {
-    position:fixed !important;
-    bottom:80px !important;
-    left:18px !important;
-    z-index:1000 !important;
+/* ═══ BACK BUTTON IN HEADER ═══ */
+.top-bar-right { display:flex; align-items:center; }
+/* ═══ FLOATING BACK BUTTON ═══ */
+.floating-back-btn-wrap {
+    position: fixed;
+    bottom: 85px;
+    left: 16px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
-.back-fab .stButton > button {
-    background:white !important;
-    color:var(--blue) !important;
-    border:2px solid var(--blue) !important;
-    border-radius:50px !important;
-    font-size:1rem !important;
-    font-weight:800 !important;
-    padding:12px 22px !important;
-    box-shadow:0 4px 20px rgba(67,97,238,0.25) !important;
-    transition:all .18s !important;
-    white-space:nowrap !important;
+.floating-back-btn {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4361EE, #7209B7);
+    color: white;
+    border: none;
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(67,97,238,0.5), 0 2px 8px rgba(10,15,44,0.2);
+    transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
-.back-fab .stButton > button:hover {
-    background:var(--blue) !important;
-    color:white !important;
-    transform:translateY(-2px) !important;
-    box-shadow:0 8px 28px rgba(67,97,238,0.4) !important;
+.floating-back-btn:hover { transform: scale(1.1); box-shadow: 0 10px 28px rgba(67,97,238,0.6); }
+.floating-back-btn:active { transform: scale(0.92); }
+.floating-back-label {
+    color: #4361EE;
+    font-size: 0.65rem;
+    font-weight: 800;
+    margin-top: 5px;
+    letter-spacing: 0.5px;
+    font-family: 'Tajawal', sans-serif;
 }
 .del-btn .stButton > button {
     background:var(--red-light) !important;color:var(--red) !important;
@@ -590,41 +606,15 @@ def go_back():
         st.session_state.page = "home"
     st.rerun()
 
+# ══ فحص query_params — الزرار الـ floating بيبعت ?back=1 ══
+if st.query_params.get("back") == "1":
+    st.query_params.clear()
+    go_back()
+
 TODAY = datetime.now().strftime("%Y-%m-%d")
 NOW   = datetime.now()
 
-# ══════════════════════════════════════════════════════════════
-# BACK BUTTON INTERCEPT (JavaScript)
-# ══════════════════════════════════════════════════════════════
-st.markdown("""
-<script>
-(function() {
-    // نضيف state وهمي في الـ browser history عشان نعترض زرار الرجوع
-    history.pushState({page: 'app'}, '', window.location.href);
 
-    window.addEventListener('popstate', function(e) {
-        // لما يضغط رجوع — نرجع state تاني ونضغط زرار الرجوع بتاعنا
-        history.pushState({page: 'app'}, '', window.location.href);
-        
-        // دور على زرار الرجوع اللي احنا عامليينه وضغطه
-        var backBtn = window.parent.document.querySelector('button[data-testid="baseButton-secondary"]');
-        if (!backBtn) {
-            // لو مش لاقيه جرب تدور بالنص
-            var allBtns = window.parent.document.querySelectorAll('button');
-            for (var i = 0; i < allBtns.length; i++) {
-                if (allBtns[i].innerText.includes('رجوع')) {
-                    backBtn = allBtns[i];
-                    break;
-                }
-            }
-        }
-        if (backBtn) {
-            backBtn.click();
-        }
-    });
-})();
-</script>
-""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════
 # TOP HEADER BAR
@@ -632,7 +622,10 @@ st.markdown("""
 total_st = len(st.session_state.students)
 total_gr = len(st.session_state.groups)
 
-st.markdown(f"""
+_cur_page = st.session_state.page
+
+if _cur_page == "home":
+    st.markdown(f"""
 <div class="top-bar">
     <div class="top-bar-inner">
         <div class="top-bar-logo">
@@ -643,22 +636,37 @@ st.markdown(f"""
             </div>
         </div>
         <div class="top-bar-stats">
-            <div class="tbs">
-                <div class="tbs-v">{total_st}</div>
-                <div class="tbs-l">طالب</div>
-            </div>
-            <div class="tbs">
-                <div class="tbs-v">{total_gr}</div>
-                <div class="tbs-l">مجموعة</div>
-            </div>
-            <div class="tbs">
-                <div class="tbs-v">{NOW.strftime('%d/%m')}</div>
-                <div class="tbs-l">اليوم</div>
+            <div class="tbs"><div class="tbs-v">{total_st}</div><div class="tbs-l">طالب</div></div>
+            <div class="tbs"><div class="tbs-v">{total_gr}</div><div class="tbs-l">مجموعة</div></div>
+            <div class="tbs"><div class="tbs-v">{NOW.strftime('%d/%m')}</div><div class="tbs-l">اليوم</div></div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+else:
+    st.markdown("""
+<div class="top-bar">
+    <div class="top-bar-inner">
+        <div class="top-bar-logo">
+            <div class="top-logo-ic">🎓</div>
+            <div class="top-bar-title">
+                <h1>منصة الأستاذة إسلام البرماوي</h1>
+                <p>Educational Monitoring Platform</p>
             </div>
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
+    # الزرار الـ floating الدائري — يشتغل عن طريق query_params (أضمن طريقة في Streamlit)
+    st.markdown("""
+<div class="floating-back-btn-wrap">
+    <a href="?back=1" target="_self" style="text-decoration:none;display:block;">
+        <button class="floating-back-btn" type="button">◀</button>
+    </a>
+    <div class="floating-back-label">رجوع</div>
+</div>
+""", unsafe_allow_html=True)
+
 
 # ══════════════════════════════════════════════════════════════
 # BOTTOM NAV
@@ -680,12 +688,7 @@ st.markdown(f'<div class="bnav">{items_html}</div>', unsafe_allow_html=True)
 
 page = st.session_state.page
 
-# زرار رجوع floating ثابت في كل الصفحات ما عدا الرئيسية
-if page != "home":
-    st.markdown('<div class="back-fab">', unsafe_allow_html=True)
-    if st.button("◀  رجوع", key="global_back"):
-        go_back()
-    st.markdown('</div>', unsafe_allow_html=True)
+
 
 # ══════════════════════════════════════════════════════════════
 # UI HELPERS
